@@ -24,30 +24,39 @@ export async function streamChat({ content, conversationId, model, token, onToke
     const decoder = new TextDecoder();
     let buffer = "";
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // SSE messages are separated by double newlines
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop(); // keep incomplete chunk for next read
-
-      for (const part of parts) {
-        const lines = part.split("\n");
-        let event = "message";
-        let data = "";
-        for (const line of lines) {
-          if (line.startsWith("event:")) event = line.slice(6).trim();
-          if (line.startsWith("data:")) data = line.slice(5).trim();
-        }
-
-        if (event === "conversation_id") onConversationId?.(data);
-        else if (event === "token") {
+    function processPart(part) {
+      const lines = part.split(/\r?\n/);
+      let event = "message";
+      let data = "";
+      for (const line of lines) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) data = line.slice(5).trim();
+      }
+      if (!data) return;
+      if (event === "conversation_id") onConversationId?.(data);
+      else if (event === "token") {
+        try {
           const parsed = JSON.parse(data);
           onToken?.(parsed.content);
-        } else if (event === "done") onDone?.();
+        } catch {
+          // ignore malformed chunk
+        }
+      } else if (event === "done") onDone?.();
+    }
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split(/\r?\n\r?\n/);
+        buffer = parts.pop(); // keep incomplete chunk for next read
+        for (const part of parts) {
+          if (part.trim()) processPart(part);
+        }
+      }
+      if (done) {
+        if (buffer.trim()) processPart(buffer); // flush whatever's left
+        break;
       }
     }
   } catch (err) {

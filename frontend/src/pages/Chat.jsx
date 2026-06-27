@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { streamChat } from "../api/chatStream";
 import ChatWindow from "../components/ChatWindow";
@@ -11,11 +11,42 @@ export default function Chat() {
   const [conversationId, setConversationId] = useState(null);
   const [model, setModel] = useState("gpt-4o-mini");
   const [streaming, setStreaming] = useState(false);
+  const queueRef = useRef([]);
+  const flushingRef = useRef(false);
+
+  function appendToLastMessage(text) {
+    setMessages((prev) => {
+      const updated = [...prev];
+      updated[updated.length - 1] = {
+        ...updated[updated.length - 1],
+        content: updated[updated.length - 1].content + text,
+      };
+      return updated;
+    });
+  }
+
+  function startQueueFlusher() {
+    if (flushingRef.current) return;
+    flushingRef.current = true;
+
+    function tick() {
+      if (queueRef.current.length === 0) {
+        flushingRef.current = false;
+        return;
+      }
+      // release a few characters per tick for a smooth typing feel
+      const chunk = queueRef.current.splice(0, 3).join("");
+      appendToLastMessage(chunk);
+      setTimeout(tick, 12); // ~12ms between renders
+    }
+    tick();
+  }
 
   function handleSend(content) {
     setMessages((prev) => [...prev, { role: "user", content }]);
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
     setStreaming(true);
+    queueRef.current = [];
 
     streamChat({
       content,
@@ -24,14 +55,8 @@ export default function Chat() {
       token,
       onConversationId: (id) => setConversationId(Number(id)),
       onToken: (chunk) => {
-        setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            content: updated[updated.length - 1].content + chunk,
-          };
-          return updated;
-        });
+        queueRef.current.push(...chunk.split(""));
+        startQueueFlusher();
       },
       onDone: () => setStreaming(false),
       onError: (err) => {

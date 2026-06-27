@@ -7,6 +7,7 @@ export default function ModelSelector({ model, setModel }) {
     >
       <option value="gpt-4o-mini">GPT-4o mini</option>
       <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+      <option value="openai/gpt-oss-120b">GPT-OSS 120B (Groq)</option>
     </select>
   );
 }
