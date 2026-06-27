@@ -21,3 +21,10 @@ class ConversationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ConversationListItem(BaseModel):
+    id: int
+    title: str
+
+    class Config:
+        from_attributes = True

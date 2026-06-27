@@ -1,18 +1,12 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
-export async function streamChat({ content, conversationId, model, token, onToken, onConversationId, onDone, onError }) {
+export async function streamChat({ content, conversationId, model, token, signal, onToken, onConversationId, onDone, onError }) {
   try {
     const res = await fetch(`${API_URL}/api/chat/stream`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        content,
-        conversation_id: conversationId,
-        model,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content, conversation_id: conversationId, model }),
+      signal,
     });
 
     if (!res.ok) {
@@ -46,20 +40,28 @@ export async function streamChat({ content, conversationId, model, token, onToke
 
     while (true) {
       const { value, done } = await reader.read();
+      if (signal?.aborted) {
+        reader.cancel().catch(() => { });
+        break;
+      }
       if (value) {
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split(/\r?\n\r?\n/);
-        buffer = parts.pop(); // keep incomplete chunk for next read
+        buffer = parts.pop();
         for (const part of parts) {
           if (part.trim()) processPart(part);
         }
       }
       if (done) {
-        if (buffer.trim()) processPart(buffer); // flush whatever's left
+        if (buffer.trim()) processPart(buffer);
         break;
       }
     }
   } catch (err) {
-    onError?.(err.message);
+    if (err.name === "AbortError") {
+      onDone?.();
+    } else {
+      onError?.(err.message);
+    }
   }
 }

@@ -34,3 +34,11 @@ export async function login(email, password) {
   if (!res.ok) throw new Error("Invalid credentials");
   return res.json();
 }
+
+export function listConversations(token) {
+  return request("/api/chat/conversations", { token });
+}
+
+export function getConversationMessages(conversationId, token) {
+  return request(`/api/chat/conversations/${conversationId}/messages`, { token });
+}
