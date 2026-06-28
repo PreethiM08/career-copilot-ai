@@ -106,21 +106,26 @@ export default function Chat() {
     flushingRef.current = false;
     setStreaming(false);
     setAnimating(false);
-    setTimeout(() => setRefreshKey((k) => k + 1), 500); // give server time to finish its finally-block save
+    setTimeout(() => setRefreshKey((k) => k + 1), 500);
   }
 
   function handleNewChat() {
+    abortRef.current?.abort();  
     sessionIdRef.current += 1;
     queueRef.current = [];
     flushingRef.current = false;
+    setStreaming(false);  
     setConversationId(null);
     setMessages([]);
   }
 
   async function handleSelectConversation(id) {
+    abortRef.current?.abort();
     sessionIdRef.current += 1;
     queueRef.current = [];
     flushingRef.current = false;
+    setAnimating(false);
+    setStreaming(false); 
     setConversationId(id);
     try {
       const msgs = await getConversationMessages(id, token);

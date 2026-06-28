@@ -147,8 +147,8 @@ async def stream_chat(
                     generated = generated.strip().strip('"').strip()
                     if generated:
                         new_title = generated[:60]
-                except Exception:
-                    pass
+                except Exception as e:
+                     print(f"TITLE GENERATION FAILED: {type(e).__name__}: {e}")
 
                 conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
                 if conv:
